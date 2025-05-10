@@ -1,8 +1,26 @@
 name: ray_cluster
 services:
+
+  minio-create-bucket:
+    image: minio/mc
+    
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set minio http://129.114.26.209:9000 your-access-key your-secret-key &&
+      if ! mc ls minio/ray; then
+        mc mb minio/ray &&
+        echo 'Bucket ray creatd'
+      else
+        echo 'Bucket ray already exists';
+      fi"
+
+
+
   ray-head:
     image: rayproject/ray:2.42.1
     container_name: ray-head
+    depends_on:
+      - minio-create-bucket
     command: |
       /bin/sh -c "
       mkdir -p /tmp/ray && 
@@ -17,6 +35,7 @@ services:
       - "9090:9090" 
     shm_size: '12g'
     volumes:
+      - /mnt/object:/mnt/rodent
       - ray_tmp:/tmp/ray
     environment:
  #     - RAY_GRAFANA_HOST=http://grafana:3000
@@ -25,7 +44,7 @@ services:
  #     - RAY_PROMETHEUS_NAME=Prometheus
       - AWS_ACCESS_KEY_ID=your-access-key     # for MinIO access
       - AWS_SECRET_ACCESS_KEY=your-secret-key
-      - AWS_ENDPOINT_URL=http://129.114.25.185:9000
+      - AWS_ENDPOINT_URL=http://129.114.26.209:9000
     user: root
 
   ray-worker-0:
@@ -40,10 +59,10 @@ services:
       - ROCR_VISIBLE_DEVICES=0
       - AWS_ACCESS_KEY_ID=your-access-key     # for MinIO access
       - AWS_SECRET_ACCESS_KEY=your-secret-key
-      - AWS_ENDPOINT_URL=http://129.114.25.185:9000
+      - AWS_ENDPOINT_URL=http://129.114.26.209:9000
     shm_size: '12g'
     volumes:
-      - /mnt/object:/mnt
+      - /mnt/object:/mnt/rodent
     depends_on:
       - ray-head
 
@@ -59,10 +78,10 @@ services:
       - ROCR_VISIBLE_DEVICES=0
       - AWS_ACCESS_KEY_ID=your-access-key     # for MinIO access
       - AWS_SECRET_ACCESS_KEY=your-secret-key
-      - AWS_ENDPOINT_URL=http://129.114.25.185:9000
+      - AWS_ENDPOINT_URL=http://129.114.26.209:9000
     shm_size: '12g'
     volumes:
-      - /mnt/object:/mnt
+      - /mnt/object:/mnt/rodent
     depends_on:
       - ray-head
 
