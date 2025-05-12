@@ -79,52 +79,29 @@ The table below shows an example, it is not a recommendation. -->
 diagram, (3) justification for your strategy, (4) relate back to lecture material, 
 (5) include specific numbers. -->
 
+
 ### Model training and training platforms
+  
 
-#### Strategy:
+The project focuses on predicting rodent infestation in restaurants using a combination of models. We decided to split the problem statement in two parts. 
 
-The project will focus on predicting rodent infestation in restaurants using a combination of multiple models. Graph attention networks are well-suited to predict the movement of rat infestations as we can model spatial dependencies on the neighbors. We will use a tree based model (XGBoost or Balanced Random Forest) to predict if there is a high chance of the restaurant being infested by rodents. We will use the predicted rodent infestation in the neighborhood (from the graph network) and combine it with historical inspection scores, and other relevant factors. We will gauge the performance of the model by holding out some data and checking if we are giving better predictions than the existing inspection results. The model will be trained and retrained on a fixed timeframe(every week) schedule to update recent changes in the data. Additionally, model versioning and artifact storage will be integrated into the pipeline to manage different model iterations effectively.  
+- In the first model, we predict the probability that a geographical region surrounding the restaurant is infested by rodents. For this we use data from 311 complaints regarding rodents as labels. The number of rodent calls serve as a severity score where higher is worse. This is measured in a geographical region of 0.5 miles around the restaurant. To model this, we used a graph attention network. Graph Networks work particularly well for modeling geographic relations (as neighbour nodes being infested can affect our nodes). This script can be seen here [Graph Model](<Model Training/scripts/gat-ray.py>).
 
-#### Relevant Parts of the Diagram:
+- The second part of the problem is using the temporal dependencies, i.e. using past historic data to predict if the particular restaurant might be infested. For this model, we use past 3 inspections scores and violations, and the predicted infestation score (which we get from the first model). This data is combined to predict if the restaurant might be infested or not. For this, we use a XGBoost classifier. One of the main reasons to use an XGBoost model is its treatment of missing data. Most restaurants do not have more than a couple past inspections and XGBoost can use the rest of the data to make a good prediction. The script to train this can be seen here [XGBoost Model](<Model Training/scripts/restaurant_infestation_predictor-final.py>).
 
-Model Architecture: Graph attention Network (GAT) with temporal data to capture dynamic interactions. Tree based model for each borough to capture restaurant specific information
-Distributed Training Setup: A Ray cluster with multiple nodes for parallel training.
-Experiment Tracking and model versioning: MLflow for logging metrics, hyperparameters, and artifacts.
-Checkpointing & Fault Tolerance: Ray Train's built-in checkpointing and fault tolerance mechanisms to ensure recovery from failures.
-Hyperparameter Tuning: Ray Tune integrated with W&B for efficient hyperparameter 
-Optimization.
+We started with 1 graph model for all the restaurants and 5 xgboost models for each borough. We decided on a model for each borough to boost accuracy as the observed behavior for each borough and hence the test accuracy was quite different. We had to move to 5 graph models (1 for each borough) as the graph which we had to model was too huge to fit one the GPUs. As a result, we moved to 5 graph models - 2 models for each borough. 
+
+To train the models, we had to use **DDP** with **RayTrain** because we got Out of Memory when running without DDP. We also used RayTrain to execute fault tolerance and checkpointing to out object storage.
+
+  We used a single ray worker with 2 GPU nodes, using 2 workers and running the RayTrain Job in DDP. All the models, the params and the metrics were pushed to MLFlow on each run. The Mlflow experiments can be seen here : [MLFlow](<http://129.114.25.90:8000/#/experiments/24?searchFilter=&orderByKey=attributes.start_time&orderByAsc=false&startTime=ALL&lifecycleFilter=Active&modelVersionFilter=All+Runs&datasetsFilter=W10%3D>)
+
+For the xgboost models, the train jobs are submitted using ray. We also used **Ray Tune** to find the best config for the XGBoost models. This code can be seen here. [XGBoost Model- ray](<Model Training/scripts/restaurant_infestation_predictor-ray.py>)
+. The config from this was used for recurring train. The results for this comparison can be seen in the experiment on MLFlow here.[MLFlow-comparison](<http://129.114.25.90:8000/#/compare-runs?runs=[%2267044be4e666477fa55766f85456e38d%22,%222d9f9f9ed14f4158be59a206234465e5%22,%22a8aa1df5a0b04334938fab7fe233177d%22,%2247296c769da146e7b9d7c197c24d5451%22]&experiments=[%2224%22]>)
 
 
+The model retrain will be triggered by Argo Workflows  which will trigger an endpoint that runs an Ansible playbook.
 
-#### Justification for Strategy
-
- Graph Attention Networks: Ideal for dynamic graph-based problems which have both spatial and temporal connections. Graph can be scaled as per data granularity. Tree based models will be able to capture past data based on historical and surrounding features.
-
-Ray Train for Distributed Training: Enables scaling across multiple nodes while providing fault tolerance through checkpointing ensuring minimal disruption in case of node or worker failures. 
-
-Ray Tune with W&B Integration: Combines the efficiency of Ray Tune's advanced search algorithms (e.g., HyperBand) with real-time monitoring of hyperparameter tuning experiments.
-
-Model Versioning & Artifact Storage: Storing models as artifacts in MLFlow ensures iterations are preserved for comparison, deployment, or rollback if needed.
-
-#### Relating to lecture material
-
-Unit 4 : We will retrain the model every week to update the model with recent data.This will be submitted as a training job as part of the pipeline.
-
-Unit 5:
-Similar to the experiments run in Unit 5 for model training with MLFlow and Ray, we will use Ray Clusters for checkpointing ensuring minimal disruption and MLFlow for versioning the model. 
-
-#### Specific Numbers:
-
-The model size will depend on the granularity of geographic data we choose. We will create a radius of a fixed diameter around each resaurant. The data points within the diameter (rodent infestations, garbage, etc) will be considered in the tree model. Additionally, each of these circles will be considered as a node in the graph.
-
-New York City has around 30,000 restaurants. On a monthly level, we will have 120 weeks of data for 10 years
-
-<!-- New York City can be divided into ~250 neighborhoods which can be nodes in the graph. On a weekly level, we have 52 * 5 = 260 weeks of data. 
-Each node will have subsequent edges with its neighbours and additional temporal edges with nodes for the next week. -->
-
-Based on the graph size, we can use a 1 or 2 nodes to train the models, which will be retrained every week.
-
-<!-- To train this model, we will ideally need  2X A100 GPUs twice a week for about 3-4 hours during development and can move to once a week(time required will be known based on the development training experiments) during actual deployment. -->
+We can see a calibration curve below which shows that the more restaurants are infested where we show a higher probability of infestation.![alt text](<calibration_curve.jpg>)
 
 
 ### Model serving and monitoring platforms
