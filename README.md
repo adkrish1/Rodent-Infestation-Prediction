@@ -201,3 +201,23 @@ To ensure the model remains accurate and effective over time, we implement a CI/
 * **Cloud-Native:** The system follows **immutable infrastructure**, **microservices (FastAPI model server)**, and **containerized deployments (Docker \+ Kubernetes)**.
 * **CI/CD & Continuous Training:** **Argo Workflows** automates model retraining, **MLflow** tracks performance, and **GitHub Actions** ensures code quality.
 * **Staged Deployment:** **Helm & ArgoCD** manage deployments across **staging, canary, and production**, ensuring safe rollouts. 
+
+
+### Cloud-native
+![alt text](diagram.jpg)
+
+### Infrastructure and Infrastructure-as-code: : 
+Terraform and ansible are used to provision resources and attach block storage. Ansible playbooks are used to provision Kubernetes, ArgoCD and Argo Workflows using kubespray. We can bring up VMs in KVM@TACC using terraform.
+
+- Terraform: https://github.com/adkrish1/Rodent-Infestation-Prediction/tree/main/Continous_X/tf
+- Ansible: https://github.com/adkrish1/Rodent-Infestation-Prediction/tree/main/Continous_X/ansible
+### Staged deployment: 
+
+We use Argo Workflows run through ansible playbooks to deploy our trained models canary, staging and production.
+- Ansible: https://github.com/adkrish1/Rodent-Infestation-Prediction/tree/main/Continous_X/ansible/argocd
+
+### CI/CD and continuous training:
+An Argo Workflow runs a python script to update data weekly. We use ArgoCD workflows to trigger the training pipeline. ArgoCD triggers an external Flask endpoint that runs an ansible playbook to trigger training on a GPU. Once the training completes we run evaluation pytests and then push tag the model to staging. We use the promote-models workflow template to promote models from staging to canary and canary to production. Model version is correctly updated in these workflow templates. 
+
+- Flask: 
+- Workflows: https://github.com/adkrish1/Rodent-Infestation-Prediction/tree/main/Continous_X/workflows
