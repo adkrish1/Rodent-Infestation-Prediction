@@ -51,11 +51,11 @@ conditions under which it may be used. -->
 |                                             | How it was created                                         | Conditions of use                                         | Links    |
 |---------------------------------------------|------------------------------------------------------------|-----------------------------------------------------------|----------|
 | Rat Sightings                               | 311 Service Requests                                       | Public domain                                             | [Link](https://data.cityofnewyork.us/Social-Services/Rat-Sightings/3q43-55fe/about_data)
-| 311 Rodent Complaints                       | Subset of 311 complaints by Louis DeBellis on NYC Open Data| Public domain                                             | [Link](https://data.cityofnewyork.us/Social-Services/311-Rodent-Complaints/cvf2-zn8s/about_data)
 | Restaurant Inspection Results               | Department of Health and Mental Hygiene (DOHMH)            | Public domain                                             | [Link](https://data.cityofnewyork.us/Health/DOHMH-New-York-City-Restaurant-Inspection-Results/43nn-pn8j/about_data)
-| NOAA Climate Data                           | NOAA National Centers for Environmental Information        | FAIR (Findable, Accessible, Interoperable, and Reusable)  | [Link](https://www.ncei.noaa.gov/metadata/geoportal/rest/metadata/item/gov.noaa.ncdc:C00861/html)
-| DOB NOW: Build – Approved Permits           |Department of Buildings (DOB)                               | Public domain                                             | [Link](https://data.cityofnewyork.us/Housing-Development/DOB-NOW-Build-Approved-Permits/rbx6-tga4/about_data)
-|GAT: Graph Attention Network| Petar Veličković | MIT License | [Paper](https://arxiv.org/pdf/1710.10903v3) [GitHub](https://github.com/PetarV-/GAT)
+| Meteostat Developers Climate Data                           |  NOAA and DWD        | CC BY-NC 4.0  | [Link](https://dev.meteostat.net/)
+| DOB Permit Issuance           |Department of Buildings (DOB)                               | Public domain                                             | [Link](https://data.cityofnewyork.us/Housing-Development/DOB-Permit-Issuance/ipu4-2q9a/about_data)
+| GAT: Graph Attention Network| Petar Veličković | MIT License | [Paper](https://arxiv.org/pdf/1710.10903v3) [GitHub](https://github.com/PetarV-/GAT)
+| XGBoost | https://github.com/dmlc/xgboost |  Apache-2.0 license | [Link](https://xgboost.readthedocs.io/en/release_3.0.0/#)
 
 
 
@@ -147,17 +147,23 @@ The steps that will be taken to implement model serving and monitoring platforms
 <!-- Make sure to clarify how you will satisfy the Unit 6 and Unit 7 requirements, 
 and which optional "difficulty" points you are attempting. -->
 
-### Data pipeline
+### Unit 8: DATA PERSON
 
 <!-- Make sure to clarify how you will satisfy the Unit 8 requirements,  and which 
 optional "difficulty" points you are attempting. -->
 
-- Persistant storage: 30GB of storage on Chameleon Object Store to store the models (storing 30 previous models), datasets (10-15GB), docker containers (5GB), etc
-- Offline data that is used for training is stored in the persistant storage. The data will be split into training, testing and validation. Some of the validation data will be saved for production data, that will be used to test the model after deployment in production
-- The datasets are updated daily, we are running a Python script to download the newer data and transform it
-- Since the NYC datasets do not contain the neighbourhood data, we will be transforming the data to include that using geo-spacial data and lat-long co-ordinates for inferencing
-- For simulating the real world data, we require how far along does the end user require the prediction (1 week, 1 month, 2 weeks, etc.), lat-long co-ordinates or a geographical block (will depend on granularity chosen)
-- [Difficulty point] During the ETL pipeline, metadata (number of new instances, any missing data, errors, etc) of the data retrieved for training will be sent to Prometheus. The high level view of this will be queryable in Grafana for the team members
+- Persistant storage: We make use of 30GB of both block and volume storage. Block storage consists of all the application's data, models, RayTrain and the container data. Object store consists of downloaded datasets, transformed datasets. [object store](https://chi.tacc.chameleoncloud.org/project/containers/container/object-persist-project8) [volume store](https://kvm.tacc.chameleoncloud.org/project/volumes/63a05616-57eb-4ab6-9342-a0184ee9f12e/)
+- Offline data: This data input to the model is obtained after transformations. Example data:
+
+| boro     | camis    | dba                   | latitude        | longitude        | month   | rat_complaints_0.1mi | rat_complaints_1.0mi | building_count_0.5mi |
+|----------|----------|-----------------------|-----------------|------------------|---------|----------------------|----------------------|----------------------|
+| Bronx    | 30075445 | MORRIS PARK BAKE SHOP | 40.848231224526 | -73.855971889932 | 2023-01 | 0                    | 21                   | 32                   |
+| Brooklyn | 50168612 | 3824 MUNCHIES LLC     | 40.590564056548 | -73.940000831706 | 2025-01 | 0                    | 11                   | 65                   |
+
+- The production data is not known until the health inspector visits the restaurant and inspects the establishment
+- We used 4 datasets: restaurant inspection data (camis, dba, lat, long, score, violation_code, inspection_date), 311 rodent complaints (complaint_date,latitude,longitude), building permits (latitude,longitude,job_start_date,end_date) amd daily weather data (max temp, min temp, total_precip). [download_data](/data_pipeline/download_data.py) [download_weather_data](/data_pipeline/download_bulk_weather.py)
+- The for each row in the restaurant inspection, we extract the MM-YYYY. Then, in that month, we find how many rat complaints and building permits were regiestered and in what radius. The radius ranges from 0.1mi to 1.0mi, in 0.1mi increments. We then find the max, min temperature, total precipitation days for that month. The lat long intersection is done using GeoPandas. The resulting data frame, is saved as a csv file. This csv file is then called by the train test val split file. The valiadtion dataset consists of only the rows for that month, the testing data consists of the previous 3 months data, and the training data is all the remaining data. [transform_data](/data_pipeline/transform_data.py)
+- *Optional* Data dashboard: We have built a data dashboard that can query the final transformed data. This visualization is done using Grafana. Here, the inspectors can see the historical rat complaints or building permit data by the borough, and month. Additionally, we have added to see the monthly historical data for a given restaurant camis (ID). By looking at this graph, the health inspectors can gain an insight to which areas they can target. [Grafana](http://129.114.25.90:3000/goto/ox7IgMaNR?orgId=1)
 
 
 ### Continuous X
