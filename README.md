@@ -13,10 +13,23 @@ propose a system for a science problem, for example.)
 
 ## Value proposition
 
-### NYC Department of Health and Mental Hygiene
+### Target: NYC Department of Health and Mental Hygiene
 - Existing business model: The New York City Department of Health and Mental Hygiene (DOHMH) uses a multi-pronged approach to address rodent infestations, combining public health interventions with private sector involvement. DOHMH primarily focuses on preventing and controlling infestations through inspections.
-- Our value proposition: Use historic inspection data along with real-time weather, construction and garbage complaints to preemptively predict the probability of infestation occurrence in restaurants belonging to a pre-defined geographic radius 
+- Our value proposition: Use historic inspection data along with weather, rat complaints and building permits to preemptively predict the probability of infestation occurrence in restaurants belonging to a pre-defined geographic radius 
+- Hepls health inspectors identify restaurants with the maximum likelyhood of rodent infestations and allows them to target restaurantss
 
+## Scale
+
+### 1) Offline data: 11GB
+- Rodent complaints (2GB), Weather data (1GB), building permits (7GB), restaurant inspection data (1GB)
+
+### 2) Models: 10 models
+- 5 XGBoost models for each borough 
+- 5 GAT models for each borough
+
+### 3) Throughtput and training time
+- The model takes 10 seconds for each inference
+- It takes 2 hours to train all models on 2 node mi100 GPUs
 ---
 
 ### Contributors
